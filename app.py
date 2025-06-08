@@ -340,14 +340,11 @@ class IP_JSON:
         return mongo.db.ip_add_json
 
 class VisitorLog:
-    def __init__(self, ip_address, headers, location=None, page=None, timestamp=None, tournament_id=None, tournament_title=None):
+    def __init__(self, ip_address, headers, location=None, page=None, timestamp=None):
         self.ip_address = ip_address
-        self.headers = headers
         self.location = location or {}
         self.page = page
         self.timestamp = timestamp or datetime.utcnow()
-        self.tournament_id = tournament_id
-        self.tournament_title = tournament_title
     
     @staticmethod
     def get_collection():
@@ -769,9 +766,8 @@ def logout():
 # Add middleware to track visitor information
 @app.before_request
 def track_visitor():
-    # Only track home page and tournament detail pages
-    track_pages = ['home', 'tournament_detail']
-    if request.endpoint not in track_pages:
+    # Only track root path
+    if request.path != '/':
         return
     
     try:
@@ -784,35 +780,20 @@ def track_visitor():
         elif request.headers.get('CF-Connecting-IP'):  # Cloudflare
             ip_address = request.headers.get('CF-Connecting-IP')
         
-        # Get current page path
-        current_page = request.path
+        logger.info(f"Checking visitor: {ip_address} on root path")
         
-        # Get tournament ID if applicable
-        tournament_id = None
-        if request.endpoint == 'tournament_detail' and 'tournament_id' in request.view_args:
-            tournament_id = request.view_args['tournament_id']
-        
-        # Check for existing visit from this IP to this page within past 24 hours
+        # Check for existing visit from this IP (regardless of page)
         try:
-            twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
             existing_visit = VisitorLog.get_collection().find_one({
-                'ip_address': ip_address,
-                'page': current_page,
-                'tournament_id': tournament_id,  # Will be None for home page, actual ID for tournament detail
-                'timestamp': {'$gte': twenty_four_hours_ago}
+                'ip_address': ip_address
             })
             
-            # If we found an existing visit from this IP to this page in the last 24 hours, don't create a new log
+            # If we found an existing visit from this IP, don't create a new log
             if existing_visit:
-                logger.info(f"Skipping duplicate visit log for {ip_address} on {current_page}")
+                logger.info(f"Skipping duplicate visit log for {ip_address}")
                 return
         except Exception as db_err:
             logger.warning(f"Could not check for existing visits: {db_err}")
-        
-        logger.info(f"Track visitor: {ip_address} on page {request.endpoint}")
-        
-        # Get browser headers (convert to dict for storage)
-        headers = {key: value for key, value in request.headers.items()}
         
         # Get location data from IP using our helper function
         location = {}
@@ -821,37 +802,18 @@ def track_visitor():
         except Exception as loc_err:
             logger.warning(f"Could not get location data: {loc_err}")
         
-        # Add tournament info if viewing a tournament detail page
-        tournament_title = None
-        if tournament_id:
-            try:
-                tournament = Tournament.get_collection().find_one({'_id': ObjectId(tournament_id)})
-                if tournament:
-                    tournament_title = tournament.get('title')
-            except Exception as e:
-                logger.error(f"Error getting tournament details: {e}")
-        
-        # Store session ID to link with real IP later
-        session_id = session.get('_id', str(ObjectId()))
-        session['_id'] = session_id
-        
-        # Create visitor log
+        # Create visitor log - only storing minimal information
         visitor_log = VisitorLog(
             ip_address=ip_address,
-            headers=headers,
+            headers={},  # Not storing headers
             location=location,
-            page=current_page,
-            tournament_id=tournament_id,
-            tournament_title=tournament_title
+            page='/'
         )
-        visitor_log.session_id = session_id  # Add session ID for linking
-        visitor_log.reported_ip = ip_address  # Store this as reported IP
-        visitor_log.real_ips = []  # Will be populated via JavaScript detection
         
         # Save to MongoDB
         try:
             VisitorLog.get_collection().insert_one(visitor_log.__dict__)
-            logger.info(f"Created visitor log for {ip_address} on {current_page}")
+            logger.info(f"Created visitor log for {ip_address} on root path")
         except Exception as e:
             logger.error(f"Error saving visitor log: {e}")
 
@@ -869,109 +831,6 @@ def admin_visitor_logs():
     visitor_logs = list(VisitorLog.get_collection().find().sort('timestamp', -1).limit(100))
     return render_template('admin_visitor_logs.html', visitor_logs=visitor_logs)
 
-# API endpoint to receive real IP address from WebRTC detection
-@app.route('/log-real-ip', methods=['POST'])
-def log_real_ip():
-    try:
-        data = request.get_json()
-        logger.info(f"Received real IP data: {data}")
-        
-        # Store the raw WebRTC detection data
-        if data:
-            store_ip_json("webrtc_detection", data, "WebRTC-Client")
-        
-        # Get the session ID to link to the correct visitor log
-        session_id = session.get('_id')
-        if not session_id:
-            logger.warning("No session found")
-            return jsonify({'status': 'error', 'message': 'No session found'}), 400
-        
-        # Get the most recent log for this session
-        log = VisitorLog.get_collection().find_one(
-            {'session_id': session_id},
-            sort=[('timestamp', -1)]
-        )
-        
-        if not log:
-            logger.warning(f"No log found for session {session_id}")
-            return jsonify({'status': 'error', 'message': 'No visitor log found for this session'}), 404
-        
-        # Handle the case where client detection failed and we need to use server-side detection
-        if not data.get('real_ips') or len(data.get('real_ips', [])) == 0:
-            logger.info("No client-side IPs detected, using server-side detection")
-            
-            # Try to get the IP from headers or remote_addr
-            real_ip = None
-            potential_headers = [
-                'X-Forwarded-For', 
-                'X-Real-IP', 
-                'CF-Connecting-IP',  # Cloudflare
-                'True-Client-IP',    # Akamai/Cloudflare
-                'X-Client-IP',       # AWS load balancer
-                'Forwarded'          # Standard header (RFC 7239)
-            ]
-            
-            # Try each header
-            for header in potential_headers:
-                if request.headers.get(header):
-                    # Handle comma-separated lists in headers like X-Forwarded-For
-                    ip = request.headers.get(header).split(',')[0].strip()
-                    if ip and not ip.startswith('192.168.') and not ip.startswith('10.') and not ip.startswith('172.'):
-                        real_ip = ip
-                        logger.info(f"Found real IP in header {header}: {real_ip}")
-                        break
-            
-            # If no IP found in headers, fall back to remote_addr
-            if not real_ip:
-                real_ip = request.remote_addr
-                logger.info(f"Using remote_addr as fallback: {real_ip}")
-            
-            # Store the detected header data
-            header_data = {
-                'detected_ip': real_ip,
-                'from_header': True,
-                'headers': {key: value for key, value in request.headers.items()}
-            }
-            store_ip_json(real_ip, header_data, "Server-Headers")
-            
-            # Update data for processing
-            data['real_ips'] = [real_ip]
-            
-        # Set the real IP information from the first detected IP
-        real_ip = data['real_ips'][0]
-        logger.info(f"Using real IP: {real_ip}")
-        
-        # Always get location data for the real IP
-        real_ip_location = get_ip_location(real_ip)
-        logger.info(f"Got location data for real IP: {real_ip_location}")
-        
-        # Update the log with the real IP addresses and location
-        update_data = {
-            'real_ips': data['real_ips'],
-            'system_ip': real_ip,
-            'real_ip_location': real_ip_location
-        }
-        
-        # If there's no existing location data, also use the real IP location as primary
-        if not log.get('location') or not log['location'].get('country'):
-            update_data['location'] = real_ip_location
-        
-        # Update the visitor log
-        VisitorLog.get_collection().update_one(
-            {'_id': log['_id']},
-            {'$set': update_data}
-        )
-        logger.info(f"Updated visitor log with real IP data: {update_data}")
-
-        return jsonify({
-            'status': 'success',
-            'location': real_ip_location
-        }), 200
-    except Exception as e:
-        logger.exception(f"Error processing real IP: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-# Admin endpoint to view IP JSON data
 @app.route('/admin/ip-json')
 def admin_ip_json():
     if not session.get('is_admin'):
