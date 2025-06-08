@@ -34,7 +34,7 @@ def datetimeformat(value, format='%b %d, %Y'):
 app = Flask(__name__)
 app.jinja_env.filters['datetimeformat'] = datetimeformat
 # Get MongoDB URI from environment variable with fallback
-app.config['MONGO_URI'] = os.environ.get('MONGO_URI', 'mongodb+srv://chesstournamentcop:chesstournamentcop@cluster0.nyy0f8e.mongodb.net/chess_tournament')
+app.config['MONGO_URI'] = os.environ.get('MONGO_URI', 'mongodb+srv://chesstournamentcop:chesstournamentcop@cluster0.nyy0f8e.mongodb.net/chess_tournament?retryWrites=true&w=majority&tls=true&tlsAllowInvalidCertificates=false')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'png', 'jpg', 'jpeg'}
@@ -53,13 +53,29 @@ app.config['VERIFICATION_SALT'] = os.environ.get('VERIFICATION_SALT', 'email-ver
 
 # Initialize PyMongo with error handling
 try:
-    mongo = PyMongo(app)
+    # Parse URI to determine if SSL options are needed
+    mongo_uri = app.config['MONGO_URI']
+    
+    # Configure additional client options 
+    client_options = {
+        "serverSelectionTimeoutMS": 5000,  # 5 seconds timeout for server selection
+        "connectTimeoutMS": 10000,  # 10 seconds timeout for connection
+        "socketTimeoutMS": 30000,  # 30 seconds timeout for socket operations
+        "maxPoolSize": 10,  # Maximum connection pool size
+        "minPoolSize": 1,  # Minimum connection pool size
+        "retryWrites": True,  # Enable retry writes
+    }
+    
+    # Create PyMongo client with options
+    mongo = PyMongo(app, connect=False)
+    
     # Test connection
     mongo.db.command('ping')
     logger.info("MongoDB connection successful")
 except Exception as e:
     logger.error(f"MongoDB connection error: {e}")
-    mongo = PyMongo(app)  # Keep the reference even if initial connection fails
+    # Keep using PyMongo but don't crash the app if the initial connection fails
+    mongo = PyMongo(app, connect=False)
 
 serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
@@ -426,7 +442,13 @@ def home():
         }
     
     # Fetch tournaments based on filters
-    tournaments = list(Tournament.get_collection().find(filters).sort('created_at', -1))
+    tournaments = []
+    try:
+        tournaments = list(Tournament.get_collection().find(filters).sort('created_at', -1))
+    except Exception as e:
+        logger.error(f"Error fetching tournaments: {e}")
+        flash("Could not connect to the database. Please try again later.", "warning")
+    
     current_year = datetime.now().year
     return render_template('home.html', tournaments=tournaments, current_year=current_year)
 
@@ -703,78 +725,91 @@ def track_visitor():
     if request.endpoint not in track_pages:
         return
     
-    # Get real IP address with fallbacks for proxy servers
-    ip_address = request.remote_addr
-    if request.headers.get('X-Forwarded-For'):
-        ip_address = request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    elif request.headers.get('X-Real-IP'):
-        ip_address = request.headers.get('X-Real-IP')
-    elif request.headers.get('CF-Connecting-IP'):  # Cloudflare
-        ip_address = request.headers.get('CF-Connecting-IP')
-    
-    # Get current page path
-    current_page = request.path
-    
-    # Get tournament ID if applicable
-    tournament_id = None
-    if request.endpoint == 'tournament_detail' and 'tournament_id' in request.view_args:
-        tournament_id = request.view_args['tournament_id']
-    
-    # Check for existing visit from this IP to this page within past 24 hours
-    twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
-    existing_visit = VisitorLog.get_collection().find_one({
-        'ip_address': ip_address,
-        'page': current_page,
-        'tournament_id': tournament_id,  # Will be None for home page, actual ID for tournament detail
-        'timestamp': {'$gte': twenty_four_hours_ago}
-    })
-    
-    # If we found an existing visit from this IP to this page in the last 24 hours, don't create a new log
-    if existing_visit:
-        logger.info(f"Skipping duplicate visit log for {ip_address} on {current_page}")
-        return
-    
-    logger.info(f"Track visitor: {ip_address} on page {request.endpoint}")
-    
-    # Get browser headers (convert to dict for storage)
-    headers = {key: value for key, value in request.headers.items()}
-    
-    # Get location data from IP using our helper function
-    location = get_ip_location(ip_address)
-    
-    # Add tournament info if viewing a tournament detail page
-    tournament_title = None
-    if tournament_id:
-        try:
-            tournament = Tournament.get_collection().find_one({'_id': ObjectId(tournament_id)})
-            if tournament:
-                tournament_title = tournament.get('title')
-        except Exception as e:
-            logger.error(f"Error getting tournament details: {e}")
-    
-    # Store session ID to link with real IP later
-    session_id = session.get('_id', str(ObjectId()))
-    session['_id'] = session_id
-    
-    # Create visitor log
-    visitor_log = VisitorLog(
-        ip_address=ip_address,
-        headers=headers,
-        location=location,
-        page=current_page,
-        tournament_id=tournament_id,
-        tournament_title=tournament_title
-    )
-    visitor_log.session_id = session_id  # Add session ID for linking
-    visitor_log.reported_ip = ip_address  # Store this as reported IP
-    visitor_log.real_ips = []  # Will be populated via JavaScript detection
-    
-    # Save to MongoDB
     try:
-        VisitorLog.get_collection().insert_one(visitor_log.__dict__)
-        logger.info(f"Created visitor log for {ip_address} on {current_page}")
+        # Get real IP address with fallbacks for proxy servers
+        ip_address = request.remote_addr
+        if request.headers.get('X-Forwarded-For'):
+            ip_address = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+        elif request.headers.get('X-Real-IP'):
+            ip_address = request.headers.get('X-Real-IP')
+        elif request.headers.get('CF-Connecting-IP'):  # Cloudflare
+            ip_address = request.headers.get('CF-Connecting-IP')
+        
+        # Get current page path
+        current_page = request.path
+        
+        # Get tournament ID if applicable
+        tournament_id = None
+        if request.endpoint == 'tournament_detail' and 'tournament_id' in request.view_args:
+            tournament_id = request.view_args['tournament_id']
+        
+        # Check for existing visit from this IP to this page within past 24 hours
+        try:
+            twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
+            existing_visit = VisitorLog.get_collection().find_one({
+                'ip_address': ip_address,
+                'page': current_page,
+                'tournament_id': tournament_id,  # Will be None for home page, actual ID for tournament detail
+                'timestamp': {'$gte': twenty_four_hours_ago}
+            })
+            
+            # If we found an existing visit from this IP to this page in the last 24 hours, don't create a new log
+            if existing_visit:
+                logger.info(f"Skipping duplicate visit log for {ip_address} on {current_page}")
+                return
+        except Exception as db_err:
+            logger.warning(f"Could not check for existing visits: {db_err}")
+        
+        logger.info(f"Track visitor: {ip_address} on page {request.endpoint}")
+        
+        # Get browser headers (convert to dict for storage)
+        headers = {key: value for key, value in request.headers.items()}
+        
+        # Get location data from IP using our helper function
+        location = {}
+        try:
+            location = get_ip_location(ip_address)
+        except Exception as loc_err:
+            logger.warning(f"Could not get location data: {loc_err}")
+        
+        # Add tournament info if viewing a tournament detail page
+        tournament_title = None
+        if tournament_id:
+            try:
+                tournament = Tournament.get_collection().find_one({'_id': ObjectId(tournament_id)})
+                if tournament:
+                    tournament_title = tournament.get('title')
+            except Exception as e:
+                logger.error(f"Error getting tournament details: {e}")
+        
+        # Store session ID to link with real IP later
+        session_id = session.get('_id', str(ObjectId()))
+        session['_id'] = session_id
+        
+        # Create visitor log
+        visitor_log = VisitorLog(
+            ip_address=ip_address,
+            headers=headers,
+            location=location,
+            page=current_page,
+            tournament_id=tournament_id,
+            tournament_title=tournament_title
+        )
+        visitor_log.session_id = session_id  # Add session ID for linking
+        visitor_log.reported_ip = ip_address  # Store this as reported IP
+        visitor_log.real_ips = []  # Will be populated via JavaScript detection
+        
+        # Save to MongoDB
+        try:
+            VisitorLog.get_collection().insert_one(visitor_log.__dict__)
+            logger.info(f"Created visitor log for {ip_address} on {current_page}")
+        except Exception as e:
+            logger.error(f"Error saving visitor log: {e}")
+
     except Exception as e:
-        logger.error(f"Error saving visitor log: {e}")
+        # Log the error but don't fail the request
+        logger.error(f"Error tracking visitor: {e}")
+        # Continue processing the request
 
 @app.route('/admin/visitor-logs')
 def admin_visitor_logs():
@@ -1047,6 +1082,22 @@ def reset_password(token):
     # GET request - show the reset password form
     return render_template('reset_password.html', token=token)
 
+# Add a route for database error page
+@app.route('/db-error')
+def db_error():
+    return render_template('db_error.html')
+
+# Add an error handler for 500 errors
+@app.errorhandler(500)
+def server_error(e):
+    # Check if the error might be related to database connection
+    error_str = str(e)
+    if 'pymongo' in error_str or 'ServerSelectionTimeoutError' in error_str or 'SSL handshake failed' in error_str:
+        logger.error(f"Database-related server error: {e}")
+        return render_template('db_error.html'), 500
+    logger.error(f"Server error: {e}")
+    return render_template('500.html'), 500
+
 if __name__ == '__main__':
     # Ensure DB connection is established before creating indexes
     try:
@@ -1091,5 +1142,5 @@ if __name__ == '__main__':
         print(f"Error initializing database: {e}")
     
     # Run the Flask app
-    port = int(os.environ.get('PORT', 1100))
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
