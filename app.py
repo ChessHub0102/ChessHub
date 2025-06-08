@@ -29,7 +29,7 @@ def datetimeformat(value, format='%b %d, %Y'):
 
 app = Flask(__name__)
 app.jinja_env.filters['datetimeformat'] = datetimeformat
-app.config['MONGO_URI'] = 'mongodb+srv://chesstournament:chesstournament@crypticloud.be143.mongodb.net/chessdb?retryWrites=true&w=majority&appName=CryptiCloud'
+app.config['MONGO_URI'] = 'mongodb+srv://chesstournamentcop:chesstournamentcop@cluster0.nyy0f8e.mongodb.net/'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'png', 'jpg', 'jpeg'}
