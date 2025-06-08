@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Create Tournament{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto bg-chess-white/90 rounded-xl shadow-chess p-4 sm:p-8 border border-chess-board-dark/10">
+  <h2 class="text-2xl sm:text-3xl font-bold text-chess-primary mb-4 sm:mb-6 font-chess flex flex-wrap items-center justify-center sm:justify-start">
+    <span class="bg-chess-gold/20 p-2 rounded-full mr-3 text-chess-gold">♟</span>
+    Create Tournament
+  </h2>
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-4 sm:space-y-6">
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Title</label>
+      <input type="text" name="title" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" required>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Tournament Type</label>
+      <select name="tournament_type" id="tournament_type" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" required>
+        <option value="">Select Tournament Type</option>
+        <option value="Classical">Classical</option>
+        <option value="Rapid">Rapid</option>
+        <option value="Blitz">Blitz</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">FIDE Status</label>
+      <div class="flex items-center">
+        <input class="h-5 w-5 text-chess-gold focus:ring-chess-gold/50 border-chess-board-dark/30 rounded" type="checkbox" name="fide_status" id="fide_status">
+        <label class="ml-2 text-chess-dark" for="fide_status">FIDE Rated Tournament</label>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Prize Details</label>
+      <textarea name="prize_details" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" rows="3" required></textarea>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Age Range</label>
+      <input type="text" name="age_range" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" placeholder="e.g. U12, 18+, 8-16" required>
+      <p class="text-xs sm:text-sm text-gray-500 mt-1">Examples: "U12" (Under 12), "18+" (Adults), "8-16" (Age range)</p>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">City (Optional)</label>
+      <input type="text" name="city" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm">
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Gender Category</label>
+      <select name="gender_category" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm">
+        <option value="Open">Open</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-chess-primary font-medium mb-2">Mode</label>
+        <select name="mode" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm">
+          <option value="Online">Online</option>
+          <option value="Offline">Offline</option>
+        </select>
+      </div>
+      
+      <div>
+        <label class="block text-chess-primary font-medium mb-2">Format</label>
+        <select name="format" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm">
+          <option value="Swiss">Swiss</option>
+          <option value="Round Robin">Round Robin</option>
+          <option value="Knockout">Knockout</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">State</label>
+      <select name="state" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm">
+        <option value="Maharashtra">Maharashtra</option>
+        <option value="Delhi">Delhi</option>
+        <option value="Karnataka">Karnataka</option>
+        <option value="Assam">Assam</option>
+        <!-- Add more Indian states -->
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Dates</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-chess-dark mb-1">Start Date</label>
+          <input type="date" name="start_date" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" required>
+        </div>
+        <div>
+          <label class="block text-sm text-chess-dark mb-1">End Date</label>
+          <input type="date" name="end_date" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" required>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Description (optional)</label>
+      <textarea name="description" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" rows="3"></textarea>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Attach File (optional)</label>
+      <input type="file" name="file" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm">
+      <p class="text-xs sm:text-sm text-gray-500 mt-1">PDF or image files only</p>
+    </div>
+
+    <div>
+      <label class="block text-chess-primary font-medium mb-2">Entry Fee (₹)</label>
+      <input type="number" name="entry_fee" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" min="0" required>
+    </div>
+
+    <div class="pt-2">
+      <button type="submit" class="w-full bg-chess-gold text-chess-dark px-6 py-3 rounded-lg font-medium hover:bg-opacity-90 transition-colors">
+        Create Tournament
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

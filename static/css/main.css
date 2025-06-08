@@ -1,0 +1,159 @@
+/* Chess Tournament Application Main Styles */
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #BCAAA4;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #795548;
+}
+
+/* Enhanced Mobile Responsiveness */
+@media (max-width: 768px) {
+  /* Navigation menu */
+  #nav-links.flex {
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    width: 100%;
+  }
+  
+  /* Fix for organizer profile sidebar */
+  .organizer-sidebar {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Better spacing for mobile */
+  .container {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  /* Better form elements on mobile */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents zoom on focus in iOS */
+  }
+  
+  /* Better button sizing on mobile */
+  button, .btn, a[class*="bg-"] {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    width: 100%;
+    display: block;
+    margin-bottom: 0.5rem;
+    text-align: center;
+  }
+  
+  /* Fix grid layouts on mobile */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Fix for tournament cards */
+  .tournament-card {
+    width: 100%;
+  }
+  
+  /* Adjust font sizes on mobile */
+  h1, h2, h3 {
+    word-break: break-word;
+  }
+  
+  /* Fix for date inputs on mobile */
+  input[type="date"] {
+    min-height: 44px;
+  }
+  
+  /* Fix for tables on mobile */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Special handling for very small screens */
+@media (max-width: 480px) {
+  body {
+    font-size: 14px;
+  }
+  
+  h2 {
+    font-size: 1.5rem !important;
+  }
+  
+  h3 {
+    font-size: 1.25rem !important;
+  }
+  
+  /* Remove background fixed on small devices for better performance */
+  body.bg-fixed {
+    background-attachment: scroll !important;
+  }
+  
+  /* Adjust padding */
+  .p-4, .p-6, .p-8 {
+    padding: 0.75rem !important;
+  }
+  
+  /* Make action buttons more accessible */
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .action-buttons > * {
+    margin-bottom: 0.5rem !important;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Utility classes */
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Better touch targets for mobile */
+@media (max-width: 768px) {
+  a, button, input[type="checkbox"], input[type="radio"], select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Improve spacing between form elements */
+  .space-y-3, .space-y-4, .space-y-5 {
+    margin-bottom: 1.5rem !important;
+  }
+  
+  /* Better mobile touch spacing */
+  .space-y-2 > * + *, .space-y-3 > * + *, .space-y-4 > * + * {
+    margin-top: 0.75rem !important;
+  }
+}

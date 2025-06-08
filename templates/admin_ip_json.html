@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="flex justify-between items-center mb-8">
+    <h1 class="text-3xl font-bold text-chess-primary">IP Address JSON Data</h1>
+    <div class="flex space-x-4">
+      <a href="{{ url_for('admin_visitor_logs') }}" class="bg-chess-primary hover:bg-chess-accent text-white px-4 py-2 rounded-lg transition-colors">Visitor Logs</a>
+      <a href="{{ url_for('admin_panel') }}" class="bg-chess-primary hover:bg-chess-accent text-white px-4 py-2 rounded-lg transition-colors">Back to Admin</a>
+      <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">Logout</a>
+    </div>
+  </div>
+  
+  <!-- Filter options -->
+  <div class="mb-6 bg-white rounded-lg shadow p-4">
+    <form method="GET" action="{{ url_for('admin_ip_json') }}">
+      <div class="flex items-center">
+        <label class="block text-sm font-medium text-gray-700 mr-4">Filter by IP address:</label>
+        <select name="ip" class="rounded-md border-gray-300 shadow-sm focus:border-chess-primary focus:ring focus:ring-chess-primary focus:ring-opacity-50">
+          <option value="">All IP addresses</option>
+          {% for ip in unique_ips %}
+          <option value="{{ ip }}" {% if ip == selected_ip %}selected{% endif %}>{{ ip }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="ml-4 bg-chess-primary hover:bg-chess-accent text-white px-4 py-2 rounded-lg transition-colors">Filter</button>
+        {% if selected_ip %}
+        <a href="{{ url_for('admin_ip_json') }}" class="ml-2 text-chess-primary hover:text-chess-accent">Clear filter</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  
+  <!-- IP JSON data table -->
+  <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-chess-primary text-white">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Time</th>
+            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">IP Address</th>
+            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Source</th>
+            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          {% for item in ip_json_data %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.ip_address }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.source }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <button class="text-chess-primary hover:text-chess-accent" 
+                      onclick="toggleDetails('{{ loop.index }}')">
+                View JSON
+              </button>
+            </td>
+          </tr>
+          <tr id="details-{{ loop.index }}" class="hidden bg-gray-50">
+            <td colspan="4" class="px-6 py-4">
+              <div class="bg-gray-100 p-4 rounded-lg">
+                <pre class="text-xs overflow-x-auto">{{ item.json_data|tojson(indent=2) }}</pre>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Download options -->
+  <div class="bg-white rounded-lg shadow p-4">
+    <h2 class="text-lg font-medium text-chess-primary mb-4">Export Options</h2>
+    <div class="flex space-x-4">
+      <a href="{{ url_for('download_ip_json', format='csv') }}{% if selected_ip %}?ip={{ selected_ip }}{% endif %}" 
+         class="bg-chess-primary hover:bg-chess-accent text-white px-4 py-2 rounded-lg transition-colors">
+        Download as CSV
+      </a>
+      <a href="{{ url_for('download_ip_json', format='json') }}{% if selected_ip %}?ip={{ selected_ip }}{% endif %}" 
+         class="bg-chess-primary hover:bg-chess-accent text-white px-4 py-2 rounded-lg transition-colors">
+        Download as JSON
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleDetails(id) {
+  const detailsRow = document.getElementById('details-' + id);
+  if (detailsRow.classList.contains('hidden')) {
+    detailsRow.classList.remove('hidden');
+  } else {
+    detailsRow.classList.add('hidden');
+  }
+}
+</script>
+{% endblock %} 
