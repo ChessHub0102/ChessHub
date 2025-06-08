@@ -17,6 +17,10 @@ import secrets
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from secure_config import get_mail_config
 
+# Load environment variables from .env file if it exists
+from dotenv import load_dotenv
+load_dotenv()
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -29,7 +33,8 @@ def datetimeformat(value, format='%b %d, %Y'):
 
 app = Flask(__name__)
 app.jinja_env.filters['datetimeformat'] = datetimeformat
-app.config['MONGO_URI'] = 'mongodb+srv://chesstournamentcop:chesstournamentcop@cluster0.nyy0f8e.mongodb.net/'
+# Get MongoDB URI from environment variable with fallback
+app.config['MONGO_URI'] = os.environ.get('MONGO_URI', 'mongodb+srv://chesstournamentcop:chesstournamentcop@cluster0.nyy0f8e.mongodb.net/chess_tournament')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'png', 'jpg', 'jpeg'}
@@ -46,7 +51,16 @@ app.config['MAIL_PASSWORD'] = mail_config['MAIL_PASSWORD']
 app.config['MAIL_DEFAULT_SENDER'] = mail_config['MAIL_DEFAULT_SENDER']
 app.config['VERIFICATION_SALT'] = os.environ.get('VERIFICATION_SALT', 'email-verification-salt')
 
-mongo = PyMongo(app)
+# Initialize PyMongo with error handling
+try:
+    mongo = PyMongo(app)
+    # Test connection
+    mongo.db.command('ping')
+    logger.info("MongoDB connection successful")
+except Exception as e:
+    logger.error(f"MongoDB connection error: {e}")
+    mongo = PyMongo(app)  # Keep the reference even if initial connection fails
+
 serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 # Email verification functions
@@ -93,7 +107,7 @@ def send_verification_email(user_email, verification_link):
     Please note: This link will expire in <strong>1 hour</strong>.
     </p>
     <p style="font-size: 14px; color: #999999; margin-top: 30px;">
-    Didn’t sign up for the Chess Tournament Hub? You can safely ignore this message.
+    Didn't sign up for the Chess Tournament Hub? You can safely ignore this message.
     </p>
     </div>
     <div style="background-color: #f0f0f0; padding: 16px; text-align: center; font-size: 12px; color: #777777;">
@@ -1034,37 +1048,48 @@ def reset_password(token):
     return render_template('reset_password.html', token=token)
 
 if __name__ == '__main__':
-    # Add this after PyMongo initialization
-    mongo.db.organizers.create_index([('username', pymongo.ASCENDING)], unique=True)
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
-    # Create admin account if not exists
-    # Create/update admin account
-    Organizer.get_collection().update_many(
-        {'is_admin': {'$exists': False}},
-        {'$set': {'is_admin': False}}
-    )
-    
-    # Check if admin exists
-    admin = Organizer.get_collection().find_one({'username': 'admin'})
-    if not admin:
-        # Create new admin account
-        admin = Organizer(
-            username='admin',
-            password='admin123',  # Default password
-            name='Admin',
-            type='admin',
-            location='System',
-            is_admin=True
+    # Ensure DB connection is established before creating indexes
+    try:
+        # Test the MongoDB connection
+        mongo.db.command('ping')
+        print("MongoDB connection successful")
+        
+        # Create indexes
+        mongo.db.organizers.create_index([('username', pymongo.ASCENDING)], unique=True)
+        
+        # Ensure upload folder exists
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        
+        # Create/update admin account
+        Organizer.get_collection().update_many(
+            {'is_admin': {'$exists': False}},
+            {'$set': {'is_admin': False}}
         )
-        Organizer.get_collection().insert_one(admin.__dict__)
-        print('Admin account created successfully!')
-    else:
-        # Just ensure admin flag is set
-        Organizer.get_collection().update_one(
-            {'username': 'admin'},
-            {'$set': {'is_admin': True}}
-        )
-        print('Admin account verified!')
+        
+        # Check if admin exists
+        admin = Organizer.get_collection().find_one({'username': 'admin'})
+        if not admin:
+            # Create new admin account
+            admin = Organizer(
+                username='admin',
+                password='admin123',  # Default password
+                name='Admin',
+                type='admin',
+                location='System',
+                is_admin=True
+            )
+            Organizer.get_collection().insert_one(admin.__dict__)
+            print('Admin account created successfully!')
+        else:
+            # Just ensure admin flag is set
+            Organizer.get_collection().update_one(
+                {'username': 'admin'},
+                {'$set': {'is_admin': True}}
+            )
+            print('Admin account verified!')
+    except Exception as e:
+        print(f"Error initializing database: {e}")
     
-    app.run(debug=True)
+    # Run the Flask app
+    port = int(os.environ.get('PORT', 1100))
+    app.run(host='0.0.0.0', port=port)
