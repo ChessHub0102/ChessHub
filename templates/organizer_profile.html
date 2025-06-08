@@ -17,7 +17,7 @@
         <div>
           <p class="mb-2"><span class="font-medium">Type:</span> {{ organizer.type|title }}</p>
           <p class="mb-2"><span class="font-medium">Location:</span> {{ organizer.location }}</p>
-          {% if organizer.contact.website %}
+          {% if organizer.contact and organizer.contact.website %}
           <p class="mb-2"><span class="font-medium">Website:</span> 
             <a href="{{ organizer.contact.website }}" class="text-chess-primary hover:underline">{{ organizer.contact.website }}</a>
           </p>
@@ -42,9 +42,21 @@
             <a href="{{ url_for('tournament_detail', tournament_id=tournament._id) }}" class="text-chess-primary hover:text-chess-accent">{{ tournament.title }}</a>
           </h6>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-            <p><span class="font-medium">Dates:</span> {{ tournament.dates|join(', ') }}</p>
+            <p><span class="font-medium">Dates:</span> 
+            {% if tournament.dates is defined and tournament.dates %}
+              {{ tournament.dates|join(', ') }}
+            {% else %}
+              TBD
+            {% endif %}
+            </p>
             <p><span class="font-medium">Location:</span> {{ tournament.state }} ({{ tournament.mode }})</p>
-            <p><span class="font-medium">Created:</span> {{ tournament.created_at.strftime('%Y-%m-%d') }}</p>
+            <p><span class="font-medium">Created:</span> 
+            {% if tournament.created_at is defined %}
+              {{ tournament.created_at.strftime('%Y-%m-%d') }}
+            {% else %}
+              Unknown date
+            {% endif %}
+            </p>
           </div>
         </div>
         {% else %}
