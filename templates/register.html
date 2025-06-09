@@ -9,7 +9,7 @@
   
   {% with messages = get_flashed_messages() %}
     {% if messages %}
-      <div class="bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+      <div class="bg-green-100 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
         {{ messages[0] }}
       </div>
     {% endif %}
@@ -57,7 +57,7 @@
     </div>
     
     <div class="space-y-3">
-  <label class="block text-chess-primary font-medium mb-2">Contact Info (optional)</label>
+  <label class="block text-chess-primary font-medium mb-2">Contact Info</label>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
     <input type="text" name="whatsapp" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" placeholder="WhatsApp">
     <input type="email" name="email" class="w-full p-3 border border-chess-board-dark/20 rounded-lg focus:ring-2 focus:ring-chess-gold/50 focus:border-chess-gold bg-white/80 shadow-sm" placeholder="Email">
